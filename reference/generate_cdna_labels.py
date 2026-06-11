@@ -1,11 +1,11 @@
 """
-Generate a tube-label CSV for the cDNA conversion protocol (cDNA_Dynamic_v7.py).
+Generate a tube-label CSV for the cDNA conversion protocol (cDNA_Dynamic_v8.py).
 
 Reads a cDNA_config.csv (same file the robot uses) and writes a CSV listing, for
 every sample, its OUTPUT tube position and the final cDNA volume + concentration
 to write on the tube — plus the per-reaction breakdown and any skip reason.
 
-The planning logic below is copied VERBATIM from cDNA_Dynamic_v7.py (plan_sample,
+The planning logic below is copied VERBATIM from cDNA_Dynamic_v8.py (plan_sample,
 _extract_samples, _reaction_wells, _rack_wells) so labels always match the run.
 Keep them in sync if the protocol changes. Runs on plain Python 3 (no opentrons).
 
@@ -53,7 +53,7 @@ def _round(v):
     return round(float(v), 2)
 
 
-# --- planning logic (mirrors cDNA_Dynamic_v7.py) ----------------------------
+# --- planning logic (mirrors cDNA_Dynamic_v8.py) ----------------------------
 def _extract_samples(cfg, max_idx=96):
     out = []
     for i in range(1, max_idx + 1):
@@ -131,7 +131,7 @@ def _reaction_wells(sample_index, n_rxns):
     return [f"{row}{c1}", f"{row}{c1 + 1}"]
 
 
-# --- water provisioning + deck-well sets (mirror cDNA_Dynamic_v7.py) ----------
+# --- water provisioning + deck-well sets (mirror cDNA_Dynamic_v8.py) ----------
 # These let the off-deck tools (this CLI + the GUI builder) refuse the SAME configs
 # the robot's fail-fast asserts refuse. KEEP IN SYNC with the protocol.
 def _chunks(vol, max_v):
@@ -214,10 +214,10 @@ def plan_all(cfg):
 
 def validate_config(cfg, active):
     """Return a list of error strings for every settings/deck guard the robot
-    (cDNA_Dynamic_v7.py) enforces: capacity, duplicate/illegal RNA positions,
+    (cDNA_Dynamic_v8.py) enforces: capacity, duplicate/illegal RNA positions,
     water-tube count + single-chunk size, MM-tube volume + well collision, the
     P300 pooling floor, and the P20 single-tip-hack overhang clearance. Empty list
-    == OK. KEEP IN SYNC with cDNA_Dynamic_v7.py's fail-fast asserts."""
+    == OK. KEEP IN SYNC with cDNA_Dynamic_v8.py's fail-fast asserts."""
     errors = []
     # capacity (cold block 30; output/RNA 24)
     if len(active) > 30:
