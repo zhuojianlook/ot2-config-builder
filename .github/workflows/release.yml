@@ -1,0 +1,85 @@
+name: Release
+
+# Builds signed Linux (AppImage + .deb) and macOS (.dmg) bundles and publishes them
+# to a GitHub Release whenever a version tag is pushed (e.g. `git tag v0.1.1 &&
+# git push origin v0.1.1`). The in-app updater reads `latest.json` from the latest
+# release, so each tagged build is delivered to already-installed copies.
+#
+# The two platforms run SERIALLY (max-parallel: 1) so tauri-action merges both into
+# the same latest.json without a race.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.1.1)."
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+            args: "--bundles deb,appimage"
+            target: ""
+          - platform: macos-14
+            args: "--target aarch64-apple-darwin"
+            target: "aarch64-apple-darwin"
+    runs-on: ${{ matrix.platform }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev \
+            librsvg2-dev patchelf libgtk-3-dev libxdo-dev libssl-dev \
+            build-essential curl wget file
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build and publish release
+        uses: tauri-apps/tauri-action@v0
+        with:
+          args: ${{ matrix.args }}
+          tagName: ${{ inputs.tag || github.ref_name }}
+          releaseName: "OT-2 Config Builder __VERSION__"
+          releaseBody: |
+            Automated build for __VERSION__.
+
+            **First install (Linux):** download the `.AppImage`, `chmod +x` it, and run it
+            (Ubuntu 22.04+ may need `sudo apt install libfuse2`). After that, the app checks
+            for updates on launch and installs them in place.
+            **First install (macOS):** open the `.dmg` and drag the app to Applications
+            (first launch: right-click -> Open once to clear Gatekeeper).
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true

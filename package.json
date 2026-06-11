@@ -1,0 +1,26 @@
+{
+  "name": "ot2-config-builder",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 1420",
+    "build": "tsc && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "tauri": "tauri",
+    "parity": "node reference/parity/run_parity.mjs"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.9.0",
+    "@tauri-apps/plugin-dialog": "^2.4.0",
+    "@tauri-apps/plugin-fs": "^2.4.2",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.10.1"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.9.0",
+    "esbuild": "^0.24.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.4"
+  }
+}
