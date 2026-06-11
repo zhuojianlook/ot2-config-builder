@@ -52,7 +52,7 @@ plate_p20_adjust,-6.0,fine depth for P20 in the PCR plate (negative = deeper); a
 plate_p300_adjust,-6.0,fine depth for P300 in the PCR plate (negative = deeper); applies to the STACKED cold plate
 plate_bare_p20_adjust,0.0,P20 plate depth when use_temp_module=false (bare plate on the slot; the -6 above is only for the stacked cold plate)
 plate_bare_p300_adjust,0.0,P300 plate depth when use_temp_module=false
-pool_drain_step1,0.75,STEP 6 drain: mm to step the P300 DOWN below the contact height for the 1st scavenge pass (suck the PCR tube dry)
+pool_drain_step1,0.25,STEP 6 drain: mm to step the P300 DOWN below the contact height for the 1st scavenge pass (suck the PCR tube dry)
 pool_drain_step2,0.1,STEP 6 drain: extra mm DOWN for the 2nd scavenge pass (total = step1+step2 below contact). OPEN-LOOP: keep above the tube bottom
 pool_drain_vol,10.0,STEP 6 drain: uL scavenged per descending pass (mostly residual cDNA + air); set 0 to disable draining
 # === LABWARE (built-in 0.5mL rack by default; no custom def needed) ===,,
