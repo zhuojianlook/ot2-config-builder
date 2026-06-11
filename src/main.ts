@@ -10,8 +10,8 @@ import {
   generatePlatemap, validateConfig as qpcrValidate,
   QPCR_MAX_GENES, QPCR_MAX_SAMPLES,
 } from "./planning/qpcr";
+import { plateSvg, coldBlockBlocked, wellColor } from "./plate";
 
-const APP_VERSION = "0.1.0";
 const isTauri = "__TAURI_INTERNALS__" in window;
 const RNA_WELLS: string[] = [];
 for (const r of "ABCD") for (let c = 1; c <= 6; c++) RNA_WELLS.push(`${r}${c}`);
@@ -55,6 +55,14 @@ function toast(msg: string) {
   document.body.append(t);
   setTimeout(() => t.remove(), 4000);
 }
+async function showVersion(span: HTMLElement) {
+  // Read the REAL installed version from Tauri so the header always matches the
+  // running build (was previously hardcoded and went stale after an update).
+  if (isTauri) {
+    try { const { getVersion } = await import("@tauri-apps/api/app"); span.textContent = "v" + (await getVersion()); return; } catch { /* fall through */ }
+  }
+  span.textContent = "dev";
+}
 async function checkUpdate(manual = false) {
   if (!isTauri) { if (manual) toast("Updates work only in the installed app."); return; }
   try {
@@ -95,6 +103,9 @@ function settingsForm(entries: Entry[], settings: Cfg, onChange: () => void): HT
 }
 function statusBar() { return h("div", { class: "statusbar" }, "Ready."); }
 function setStatus(bar: HTMLElement, msg: string, level = "") { bar.className = "statusbar " + level; bar.textContent = msg; }
+function mapBlock(label: string, svg: SVGElement | HTMLElement): HTMLElement {
+  return h("div", { class: "mapblock" }, h("div", { class: "maplabel" }, label), svg as any);
+}
 
 // ============================================================================
 // cDNA panel
@@ -109,6 +120,7 @@ function cdnaPanel(): HTMLElement {
   const bar = statusBar();
   const rowsBox = h("div", { class: "samples" });
   const preview = h("tbody");
+  const deckMap = h("div", { class: "deckmap" });
 
   const readRows = () => Array.from(rowsBox.querySelectorAll(".srow")).map((r) => ({
     name: $<HTMLInputElement>(".s-name", r).value.trim(),
@@ -135,6 +147,21 @@ function cdnaPanel(): HTMLElement {
           ...Array(8).fill(0).map(() => h("td", {}, "—")), h("td", {}, s.status.replace(/^SKIP:\s*/, ""))));
       }
     }
+    // deck maps: each active sample gets a colour shown across all three racks
+    const rna = new Map(), cold = new Map(), out = new Map();
+    res.active.forEach((s, i) => {
+      const color = wellColor(i), label = String(i + 1);
+      if (s.position) rna.set(s.position, { color, label, title: `${s.name}  (${s.position})` });
+      (s.rxn_wells || []).forEach((w, k) => cold.set(w, { color, label, title: `${s.name}${(s.rxn_wells || []).length > 1 ? " rxn" + (k + 1) : ""}  (${w})` }));
+      if (s.out_well) out.set(s.out_well, { color, label, title: `${s.name}  →  ${res.outSlot}:${s.out_well}` });
+    });
+    const slot = (k: string, d: string) => String((settings as any)[k] ?? d);
+    deckMap.replaceChildren(
+      mapBlock(`RNA input rack — slot ${slot("slot_rna_rack", "1")}`, plateSvg("ABCD".split(""), 6, rna)),
+      mapBlock(`Cold-block reactions — slot ${slot("slot_temp_module", "4")}`, plateSvg("ABCDEFGH".split(""), 12, cold, coldBlockBlocked())),
+      mapBlock(`Output (diluted cDNA) rack — slot ${res.outSlot}`, plateSvg("ABCD".split(""), 6, out)),
+    );
+
     const nActive = res.active.length;
     if (errs.length) setStatus(bar, `${nActive} active — robot would REJECT: ${errs[0]}${errs.length > 1 ? ` (+${errs.length - 1} more)` : ""}`, "error");
     else setStatus(bar, `${nActive} active sample(s), ${res.active.reduce((a, s) => a + (s.n_rxns || 0), 0)} reaction(s). Ready to save.`, "ok");
@@ -179,6 +206,7 @@ function cdnaPanel(): HTMLElement {
       h("table", { class: "grid" },
         h("thead", {}, h("tr", {}, ...["Sample", "ng/µL", "Regime", "#Rxn", "Cold-block", "RNA/rxn", "Water/rxn", "Out tube", "Final µL", "@ng/µL", "Status / flags"].map((t) => h("th", {}, t)))),
         preview)),
+    h("div", { class: "card" }, h("h3", {}, "Well map (where each sample goes)"), deckMap),
     h("div", { class: "row" }, h("button", { class: "btn primary", onclick: saveConfig }, "Save config CSV"), h("button", { class: "btn", onclick: saveLabels }, "Save labels CSV")),
     bar,
     (refresh(), bar.parentElement ? document.createComment("") : document.createComment("")),
@@ -217,6 +245,7 @@ function qpcrPanel(): HTMLElement {
   const geneBox = h("div", { class: "namelist" });
   const sampBox = h("div", { class: "namelist" });
   const preview = h("tbody");
+  const plateMap = h("div", { class: "deckmap" });
   const reps = h("input", { type: "number", min: 1, max: 3, value: 3, style: "width:60px", onchange: refresh }) as HTMLInputElement;
   const premixed = h("input", { type: "checkbox", onchange: refresh }) as HTMLInputElement;
 
@@ -227,7 +256,19 @@ function qpcrPanel(): HTMLElement {
     const cfg = cfgNow();
     const errs = qpcrValidate(cfg);
     preview.replaceChildren();
-    if (!errs.length) for (const e of generatePlatemap(cfg).entries) preview.append(h("tr", {}, h("td", {}, e.well), h("td", {}, e.gene), h("td", {}, e.sample)));
+    const fills = new Map();
+    const geneList = namesOf(geneBox);
+    if (!errs.length) {
+      const gi = new Map(geneList.map((g, i) => [g, i]));
+      for (const e of generatePlatemap(cfg).entries) {
+        preview.append(h("tr", {}, h("td", {}, e.well), h("td", {}, e.gene), h("td", {}, e.sample)));
+        fills.set(e.well, { color: wellColor(gi.get(e.gene) ?? 0), title: `${e.well}: ${e.gene} / ${e.sample}` });
+      }
+    }
+    plateMap.replaceChildren(
+      plateSvg("ABCDEFGHIJKLMNOP".split(""), 24, fills),
+      h("div", { class: "legend" }, ...geneList.map((g, i) => h("span", { class: "lg" }, h("span", { class: "sw", style: `background:${wellColor(i)}` }), g))),
+    );
     const ng = namesOf(geneBox).length, ns = namesOf(sampBox).length;
     if (errs.length) setStatus(bar, "Cannot build plate: " + errs[0], "error");
     else setStatus(bar, `${ns} sample(s) × ${ng} gene(s) × ${reps.value} reps = ${ns * ng * Number(reps.value)} of 384 wells. Ready to save.`, "ok");
@@ -264,7 +305,8 @@ function qpcrPanel(): HTMLElement {
       h("div", { class: "card" }, h("h3", {}, `Genes (max ${QPCR_MAX_GENES})`), h("button", { class: "btn small", onclick: () => addName(geneBox, QPCR_MAX_GENES) }, "+ Add gene"), geneBox),
       h("div", { class: "card" }, h("h3", {}, `Samples (max ${QPCR_MAX_SAMPLES})`), h("button", { class: "btn small", onclick: () => addName(sampBox, QPCR_MAX_SAMPLES) }, "+ Add sample"), sampBox)),
     settingsForm(setEntries, settings, refresh),
-    h("div", { class: "card" }, h("h3", {}, "384-well plate map preview"),
+    h("div", { class: "card" }, h("h3", {}, "384-well plate map"), plateMap),
+    h("details", { class: "settings" }, h("summary", {}, "Plate map as a table"),
       h("table", { class: "grid" }, h("thead", {}, h("tr", {}, h("th", {}, "384 well"), h("th", {}, "Gene"), h("th", {}, "Sample"))), preview)),
     h("div", { class: "row" }, h("button", { class: "btn primary", onclick: saveConfig }, "Save config CSV"), h("button", { class: "btn", onclick: savePlatemap }, "Save platemap")),
     bar,
@@ -304,8 +346,10 @@ function main() {
     tabBtns.forEach((b) => b.classList.toggle("active", b.textContent === name));
     Object.entries(panels).forEach(([n, p]) => p.classList.toggle("active", n === name));
   }
+  const verSpan = h("span", { class: "ver" }, "");
+  showVersion(verSpan);
   app.append(
-    h("header", { class: "app" }, h("h1", {}, "OT-2 Config Builder"), h("span", { class: "ver" }, "v" + APP_VERSION),
+    h("header", { class: "app" }, h("h1", {}, "OT-2 Config Builder"), verSpan,
       h("span", { class: "spacer" }), h("button", { class: "btn small", onclick: () => checkUpdate(true) }, "Check for updates")),
     h("div", { id: "update-banner", class: "update-banner" }),
     h("div", { class: "tabs" }, ...tabBtns),
