@@ -31,7 +31,7 @@ p20_min_vol,1.0,Minimum accurate P20 volume (uL); RNA below this skips the sampl
 p300_min_vol,20,Minimum accurate P300 volume (uL); pooling/dilution uses the P300 above this
 aspirate_delay,0.5,seconds after each aspirate
 dispense_delay,0.5,seconds after each dispense
-mix_reps_mastermix,10,master-mix homogenise reps
+mix_reps_mastermix,15,master-mix homogenise reps
 mix_reps_reaction,8,per-reaction mix reps after RNA
 mix_reps_dilute,8,final pooled+diluted cDNA mix reps
 # === WELL HEIGHTS (mm from bottom; tune on the bench) ===,,
@@ -42,6 +42,7 @@ tube_z_raise,0.0,extra mm to lift all in-tube tip heights if the shorter Sarsted
 tube_z,1.5,base asp/disp height in 0.5 mL tubes (tube_z_raise is added on top)
 tube_z_low,0.6,base low draw height for near-empty tubes
 mm_tube_z,1.0,base asp/disp height in the master-mix tube
+mm_blow_z,2.0,mm from the MM-tube bottom for blow-outs into the MM tube (low so reagent is fully delivered)
 plate_z,1.0,asp/disp height in PCR-plate wells (no raise applied)
 rna_dispense_z,2.0,RNA dispense height into the reaction (~1mm above plate_z so it delivers right at the tube; raise only if the tip dips into the reaction)
 tube_p20_adjust,-1.0,fine depth for P20 in the 24-well racks (negative = deeper)
